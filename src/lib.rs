@@ -7,7 +7,10 @@ mod proto {
 
 pub use client::Fvs2dClient;
 pub use prost_types::Timestamp;
-pub use proto::{Commit, Layer, Mount, Repository, UnmountMode};
+pub use proto::{
+    Commit, CommitSelector, Layer, Mount, Repository, RestoreResponse, UnmountMode,
+    commit_selector::Selector,
+};
 
 #[cfg(test)]
 mod tests {}

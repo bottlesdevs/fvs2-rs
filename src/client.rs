@@ -18,7 +18,8 @@ use crate::{
     error::{Error, Result},
     proto::{
         self, Commit, CommitRequest, CreateMountRequest, GetMountRequest, InitRepositoryRequest,
-        Layer, ListCommitsRequest, Mount, MountSpec, Repository, RestoreRequest, ShutdownRequest,
+        Layer, ListCommitsRequest, Mount, MountSpec, Repository, RestoreRequest, RestoreResponse,
+        ShutdownRequest,
         UnmountMode, UnmountRequest, fvs2d_client::Fvs2dClient as GrpcClient,
     },
 };
@@ -150,7 +151,7 @@ impl Fvs2dClient {
         destination: Option<impl AsRef<Path>>,
         clean: bool,
         reset: bool,
-    ) -> Result<()> {
+    ) -> Result<RestoreResponse> {
         let mut client = self.client.clone();
 
         let resp = client
@@ -163,7 +164,7 @@ impl Fvs2dClient {
             })
             .await?;
 
-        Ok(())
+        Ok(resp.into_inner())
     }
 
     /// Mount `layers` at `mount_point`, optionally with a writable `upper` dir.
