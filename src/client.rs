@@ -1,5 +1,4 @@
 use std::{
-    ops::Deref,
     path::{Path, PathBuf},
     process::{Child, Command, Stdio},
     time::Duration,
@@ -19,8 +18,7 @@ use crate::{
     proto::{
         self, Commit, CommitRequest, CreateMountRequest, GetMountRequest, InitRepositoryRequest,
         Layer, ListCommitsRequest, Mount, MountSpec, Repository, RestoreRequest, RestoreResponse,
-        ShutdownRequest,
-        UnmountMode, UnmountRequest, fvs2d_client::Fvs2dClient as GrpcClient,
+        ShutdownRequest, UnmountMode, UnmountRequest, fvs2d_client::Fvs2dClient as GrpcClient,
     },
 };
 
@@ -34,14 +32,6 @@ pub struct Fvs2dClient {
     client: GrpcClient<Channel>,
     _child: Child,
     sock: PathBuf,
-}
-
-impl Deref for Fvs2dClient {
-    type Target = GrpcClient<Channel>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.client
-    }
 }
 
 impl Drop for Fvs2dClient {
