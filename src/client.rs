@@ -47,14 +47,24 @@ impl Fvs2dClient {
     /// dir) and return once gRPC health reports serving.
     ///
     /// Requires `fvs2d` on `PATH`.
-    pub async fn new() -> Result<Self> {
+    pub async fn new(executable: impl AsRef<Path>) -> Result<Self> {
+        let executable = executable.as_ref();
+
+        if !executable.is_file() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                format!("{} does not exist", executable.display()),
+            )
+            .into());
+        }
+
         let runtime = std::env::var_os("XDG_RUNTIME_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(std::env::temp_dir);
         let sock = runtime.join(format!("fvs2d-{}.sock", std::process::id()));
         let control = format!("unix:{}", sock.display());
 
-        let mut child = Command::new("fvs2d")
+        let mut child = Command::new(executable)
             .arg("-control")
             .arg(&control)
             .stdin(Stdio::null())
