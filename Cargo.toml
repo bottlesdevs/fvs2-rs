@@ -11,6 +11,7 @@ tonic-prost.workspace = true
 tonic-health.workspace = true
 thiserror.workspace = true
 futures-timer = "3"
+serde.workspace = true
 
 [build-dependencies]
 tonic-prost-build.workspace = true
