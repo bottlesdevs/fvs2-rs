@@ -1,5 +1,5 @@
 use std::{
-    path::{Path, PathBuf},
+    path::Path,
     process::{Child, Command, Stdio},
     time::Duration,
 };
@@ -24,31 +24,36 @@ use crate::{
 
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
-/// Handle to a locally spawned `fvs2d` manager and its gRPC channel.
-///
-/// Derefs to the generated tonic client for raw RPCs. On drop, the child is
-/// killed and the unix control socket is removed.
+/// A reconnectable client for an `fvs2d` daemon.
 pub struct Fvs2dClient {
     client: GrpcClient<Channel>,
-    _child: Child,
-    sock: PathBuf,
-}
-
-impl Drop for Fvs2dClient {
-    fn drop(&mut self) {
-        let _ = self._child.kill();
-        let _ = self._child.wait();
-        let _ = std::fs::remove_file(&self.sock);
-    }
 }
 
 impl Fvs2dClient {
-    /// Spawn `fvs2d` on a unix socket under `$XDG_RUNTIME_DIR` (or the temp
-    /// dir) and return once gRPC health reports serving.
+    /// Connect to a daemon already serving on `socket`.
+    pub async fn connect(socket: impl AsRef<Path>) -> Result<Self> {
+        let endpoint = endpoint(socket.as_ref())?;
+        let channel = endpoint.connect().await?;
+        check_health(&channel).await?;
+        Ok(Self {
+            client: GrpcClient::new(channel),
+        })
+    }
+
+    /// Connect to the stable `socket`, spawning the daemon when necessary.
     ///
-    /// Requires `fvs2d` on `PATH`.
-    pub async fn new(executable: impl AsRef<Path>) -> Result<Self> {
+    /// The spawned process is deliberately detached from this client so it can
+    /// serve later clients after this one is dropped.
+    pub async fn connect_or_spawn(
+        executable: impl AsRef<Path>,
+        socket: impl AsRef<Path>,
+    ) -> Result<Self> {
         let executable = executable.as_ref();
+        let socket = socket.as_ref();
+
+        if let Ok(client) = Self::connect(socket).await {
+            return Ok(client);
+        }
 
         if !executable.is_file() {
             return Err(std::io::Error::new(
@@ -58,11 +63,10 @@ impl Fvs2dClient {
             .into());
         }
 
-        let runtime = std::env::var_os("XDG_RUNTIME_DIR")
-            .map(PathBuf::from)
-            .unwrap_or_else(std::env::temp_dir);
-        let sock = runtime.join(format!("fvs2d-{}.sock", std::process::id()));
-        let control = format!("unix:{}", sock.display());
+        if let Some(parent) = socket.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let control = format!("unix:{}", socket.display());
 
         let mut child = Command::new(executable)
             .arg("-control")
@@ -77,8 +81,6 @@ impl Fvs2dClient {
 
         Ok(Self {
             client: GrpcClient::new(channel),
-            _child: child,
-            sock,
         })
     }
 
@@ -232,12 +234,23 @@ impl Fvs2dClient {
     }
 }
 
-/// Poll until the child is serving or has exited.
-async fn connect_ready(endpoint: &Endpoint, child: &mut Child) -> Result<Channel> {
+fn endpoint(socket: &Path) -> Result<Endpoint> {
+    Ok(Endpoint::from_shared(format!("unix:{}", socket.display()))?)
+}
+
+async fn check_health(channel: &Channel) -> Result<()> {
     let request = HealthCheckRequest {
         service: proto::fvs2d_server::SERVICE_NAME.to_string(),
     };
+    let response = HealthClient::new(channel.clone()).check(request).await?;
+    if response.get_ref().status() != ServingStatus::Serving {
+        return Err(Status::unavailable("fvs2d is not serving").into());
+    }
+    Ok(())
+}
 
+/// Poll until the child is serving or has exited.
+async fn connect_ready(endpoint: &Endpoint, child: &mut Child) -> Result<Channel> {
     loop {
         if let Some(status) = child.try_wait()? {
             return Err(Error::ProcessExit(status));
@@ -251,13 +264,9 @@ async fn connect_ready(endpoint: &Endpoint, child: &mut Child) -> Result<Channel
             }
         };
 
-        let mut health = HealthClient::new(channel.clone());
-        match health.check(request.clone()).await {
-            Ok(response) if response.get_ref().status() == ServingStatus::Serving => {
-                return Ok(channel);
-            }
-            Ok(_) => Delay::new(HEALTH_POLL_INTERVAL).await,
-            Err(status) => return Err(status.into()),
+        match check_health(&channel).await {
+            Ok(()) => return Ok(channel),
+            Err(_) => Delay::new(HEALTH_POLL_INTERVAL).await,
         }
     }
 }
