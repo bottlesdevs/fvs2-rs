@@ -7,15 +7,23 @@ mod proto {
 
 pub use client::Fvs2dClient;
 pub use prost_types::Timestamp;
-pub use proto::{Commit, Layer, Mount, Repository, RestoreResponse, UnmountMode};
+pub use proto::{Commit, CommitSummary, Layer, Mount, Repository, RestoreResponse, UnmountMode};
 
 impl Layer {
     pub fn new(repository: &Repository, commit: Option<&Commit>) -> Self {
+        Self::from_state_id(repository, commit.map(|commit| commit.state_id.as_str()))
+    }
+
+    pub fn from_summary(repository: &Repository, commit: Option<&CommitSummary>) -> Self {
+        Self::from_state_id(repository, commit.map(|commit| commit.state_id.as_str()))
+    }
+
+    fn from_state_id(repository: &Repository, state_id: Option<&str>) -> Self {
         Layer {
             repository_path: repository.repository_path.clone(),
-            revision: commit.map(|commit| crate::proto::CommitSelector {
+            revision: state_id.map(|state_id| crate::proto::CommitSelector {
                 selector: Some(crate::proto::commit_selector::Selector::StateIdOrPrefix(
-                    commit.state_id.clone(),
+                    state_id.to_owned(),
                 )),
             }),
         }
@@ -23,4 +31,28 @@ impl Layer {
 }
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use super::*;
+
+    #[test]
+    fn layer_uses_listed_commit_summary() {
+        let repository = Repository {
+            repository_path: "/repo".into(),
+            block_size: 4096,
+        };
+        let commit = CommitSummary {
+            state_id: "abc123".into(),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            Layer::from_summary(&repository, Some(&commit))
+                .revision
+                .unwrap()
+                .selector,
+            Some(crate::proto::commit_selector::Selector::StateIdOrPrefix(
+                "abc123".into()
+            ))
+        );
+    }
+}

@@ -16,9 +16,10 @@ use tonic_health::pb::{
 use crate::{
     error::{Error, Result},
     proto::{
-        self, Commit, CommitRequest, CreateMountRequest, GetMountRequest, InitRepositoryRequest,
-        Layer, ListCommitsRequest, Mount, MountSpec, Repository, RestoreRequest, RestoreResponse,
-        ShutdownRequest, UnmountMode, UnmountRequest, fvs2d_client::Fvs2dClient as GrpcClient,
+        self, Commit, CommitRequest, CommitSummary, CreateMountRequest, GetMountRequest,
+        InitRepositoryRequest, Layer, ListCommitsRequest, Mount, MountSpec, Repository,
+        RestoreRequest, RestoreResponse, ShutdownRequest, UnmountMode, UnmountRequest,
+        fvs2d_client::Fvs2dClient as GrpcClient,
     },
 };
 
@@ -129,12 +130,14 @@ impl Fvs2dClient {
     }
 
     /// List commits in `repository`, newest-first as returned by the daemon.
-    pub async fn list_commits(&self, repository: &Repository) -> Result<Vec<Commit>> {
+    pub async fn list_commits(&self, repository: &Repository) -> Result<Vec<CommitSummary>> {
         let mut client = self.client.clone();
 
         let resp = client
             .list_commits(ListCommitsRequest {
                 repository_path: repository.repository_path.clone(),
+                page_size: 0,
+                page_token: String::new(),
             })
             .await?;
 
