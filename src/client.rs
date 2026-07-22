@@ -144,7 +144,7 @@ impl Fvs2dClient {
         Ok(resp.into_inner().commits)
     }
 
-    /// Restore `commit` into `repository`.
+    /// Restore `state_id_or_prefix` into `repository`.
     ///
     /// - `destination`: override restore target (default: repo root)
     /// - `clean`: remove files in the destination that are not in the commit
@@ -152,7 +152,7 @@ impl Fvs2dClient {
     pub async fn restore(
         &self,
         repository: &Repository,
-        commit: &Commit,
+        state_id_or_prefix: &str,
         destination: Option<impl AsRef<Path>>,
         clean: bool,
         reset: bool,
@@ -162,7 +162,7 @@ impl Fvs2dClient {
         let resp = client
             .restore(RestoreRequest {
                 repository_path: repository.repository_path.to_string(),
-                state_id_or_prefix: commit.state_id.to_string(),
+                state_id_or_prefix: state_id_or_prefix.to_string(),
                 destination_path: destination.map(|dest| dest.as_ref().display().to_string()),
                 clean,
                 reset,
