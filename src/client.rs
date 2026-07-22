@@ -16,11 +16,10 @@ use tonic_health::pb::{
 use crate::{
     error::{Error, Result},
     proto::{
-        self, Commit, CommitRequest, CommitSummary, CreateMountRequest, GetMountRequest,
-        DiffMountRequest, FileChange, InitRepositoryRequest, Layer, ListCommitsRequest, Mount,
+        self, Commit, CommitRequest, CommitSummary, CreateMountRequest, DiffMountRequest,
+        FileChange, GetMountRequest, InitRepositoryRequest, Layer, ListCommitsRequest, Mount,
         MountSpec, Repository, RestoreRequest, RestoreResponse, ShutdownRequest, UnmountMode,
-        UnmountRequest,
-        fvs2d_client::Fvs2dClient as GrpcClient,
+        UnmountRequest, fvs2d_client::Fvs2dClient as GrpcClient,
     },
 };
 
@@ -196,12 +195,18 @@ impl Fvs2dClient {
         Ok(resp.into_inner())
     }
 
-    /// Report the writable entries that differ from `mount`'s resolved lower layers.
-    pub async fn diff_mount(&self, mount: &Mount) -> Result<Vec<FileChange>> {
+    /// Report the writable entries that differ from `mount`'s resolved lower layers,
+    /// optionally removing unchanged entries from its upper directory.
+    pub async fn diff_mount(
+        &self,
+        mount: &Mount,
+        prune_unchanged: bool,
+    ) -> Result<Vec<FileChange>> {
         let mut client = self.client.clone();
         let resp = client
             .diff_mount(DiffMountRequest {
                 mount_id: mount.id.clone(),
+                prune_unchanged,
             })
             .await?;
 
