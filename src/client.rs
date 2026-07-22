@@ -17,8 +17,9 @@ use crate::{
     error::{Error, Result},
     proto::{
         self, Commit, CommitRequest, CommitSummary, CreateMountRequest, GetMountRequest,
-        InitRepositoryRequest, Layer, ListCommitsRequest, Mount, MountSpec, Repository,
-        RestoreRequest, RestoreResponse, ShutdownRequest, UnmountMode, UnmountRequest,
+        DiffMountRequest, FileChange, InitRepositoryRequest, Layer, ListCommitsRequest, Mount,
+        MountSpec, Repository, RestoreRequest, RestoreResponse, ShutdownRequest, UnmountMode,
+        UnmountRequest,
         fvs2d_client::Fvs2dClient as GrpcClient,
     },
 };
@@ -193,6 +194,18 @@ impl Fvs2dClient {
             .await?;
 
         Ok(resp.into_inner())
+    }
+
+    /// Report the writable entries that differ from `mount`'s resolved lower layers.
+    pub async fn diff_mount(&self, mount: &Mount) -> Result<Vec<FileChange>> {
+        let mut client = self.client.clone();
+        let resp = client
+            .diff_mount(DiffMountRequest {
+                mount_id: mount.id.clone(),
+            })
+            .await?;
+
+        Ok(resp.into_inner().changes)
     }
 
     /// Unmount a previously created [`Mount`] using `mode`.
