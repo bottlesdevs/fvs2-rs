@@ -8,8 +8,8 @@ mod proto {
 pub use client::Fvs2dClient;
 pub use prost_types::Timestamp;
 pub use proto::{
-    ChangeKind, Commit, CommitSummary, FileChange, Layer, Mount, Repository, RestoreResponse,
-    UnmountMode,
+    ChangeKind, Commit, CommitSummary, FileChange, Layer, Mount, Progress, Repository,
+    RestoreResponse, UnmountMode,
 };
 
 impl Layer {

@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+futures-core.workspace = true
+futures-util.workspace = true
 tonic.workspace = true
 prost.workspace = true
 prost-types.workspace = true

@@ -4,7 +4,9 @@ use std::{
     time::Duration,
 };
 
+use futures_core::Stream;
 use futures_timer::Delay;
+use futures_util::TryStreamExt;
 use tonic::{
     Status,
     transport::{Channel, Endpoint},
@@ -129,6 +131,25 @@ impl Fvs2dClient {
         Ok(resp.into_inner())
     }
 
+    /// Commit the current working tree and stream its progress.
+    pub async fn commit_stream(
+        &self,
+        repository: &Repository,
+        message: String,
+    ) -> Result<impl Stream<Item = Result<proto::Progress>> + Send + 'static> {
+        let mut client = self.client.clone();
+        let stream = client
+            .commit_stream(CommitRequest {
+                message,
+                allow_empty: false,
+                repository_path: repository.repository_path.clone(),
+            })
+            .await?
+            .into_inner();
+
+        Ok(stream.map_err(Error::from))
+    }
+
     /// List commits in `repository`, newest-first as returned by the daemon.
     pub async fn list_commits(&self, repository: &Repository) -> Result<Vec<CommitSummary>> {
         let mut client = self.client.clone();
@@ -170,6 +191,30 @@ impl Fvs2dClient {
             .await?;
 
         Ok(resp.into_inner())
+    }
+
+    /// Restore a state and stream its progress.
+    pub async fn restore_stream(
+        &self,
+        repository: &Repository,
+        state_id_or_prefix: &str,
+        destination: Option<impl AsRef<Path>>,
+        clean: bool,
+        reset: bool,
+    ) -> Result<impl Stream<Item = Result<proto::Progress>> + Send + 'static> {
+        let mut client = self.client.clone();
+        let stream = client
+            .restore_stream(RestoreRequest {
+                repository_path: repository.repository_path.to_string(),
+                state_id_or_prefix: state_id_or_prefix.to_string(),
+                destination_path: destination.map(|dest| dest.as_ref().display().to_string()),
+                clean,
+                reset,
+            })
+            .await?
+            .into_inner();
+
+        Ok(stream.map_err(Error::from))
     }
 
     /// Mount `layers` at `mount_point`, optionally with a writable `upper` dir.

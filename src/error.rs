@@ -12,4 +12,6 @@ pub enum Error {
     Status(#[from] tonic::Status),
     #[error("fvs2d exited unexpectedly with status {0}")]
     ProcessExit(std::process::ExitStatus),
+    #[error("{0} progress stream ended without a result")]
+    MissingStreamResult(&'static str),
 }
