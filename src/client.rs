@@ -233,6 +233,7 @@ impl Fvs2dClient {
                     layers,
                     upper_path: upper.map(|path| path.as_ref().display().to_string()),
                     debug: false,
+                    clear_privileged_bits: false,
                 }),
             })
             .await?;
