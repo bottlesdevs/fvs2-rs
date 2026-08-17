@@ -45,6 +45,7 @@ impl Fvs2dClient {
 
     /// Connect to the stable `socket`, spawning the daemon when necessary.
     ///
+    /// A bare executable name is resolved through `$PATH` by the operating system.
     /// The spawned process is deliberately detached from this client so it can
     /// serve later clients after this one is dropped.
     pub async fn connect_or_spawn(
@@ -56,14 +57,6 @@ impl Fvs2dClient {
 
         if let Ok(client) = Self::connect(socket).await {
             return Ok(client);
-        }
-
-        if !executable.is_file() {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                format!("{} does not exist", executable.display()),
-            )
-            .into());
         }
 
         if let Some(parent) = socket.parent() {
