@@ -124,14 +124,16 @@ impl Fvs2dClient {
         Ok(resp.into_inner())
     }
 
-    /// Commit the current working tree and stream its progress.
+    /// Commit the current working tree, reporting each progress update.
+    ///
     /// When `allow_empty` is true, record a new commit even if the tree is unchanged.
-    pub async fn commit_stream(
+    pub async fn commit_with_progress(
         &self,
         repository: &Repository,
         message: String,
         allow_empty: bool,
-    ) -> Result<impl Stream<Item = Result<proto::Progress>> + Send + 'static> {
+        on_progress: impl FnMut(&proto::Progress),
+    ) -> Result<Commit> {
         let mut client = self.client.clone();
         let stream = client
             .commit_stream(CommitRequest {
@@ -142,7 +144,13 @@ impl Fvs2dClient {
             .await?
             .into_inner();
 
-        Ok(stream.map_err(Error::from))
+        finish_stream(
+            stream.map_err(Error::from),
+            on_progress,
+            |progress| progress.result_commit,
+            "commit",
+        )
+        .await
     }
 
     /// List commits in `repository`, newest-first as returned by the daemon.
@@ -188,15 +196,16 @@ impl Fvs2dClient {
         Ok(resp.into_inner())
     }
 
-    /// Restore a state and stream its progress.
-    pub async fn restore_stream(
+    /// Restore a state, reporting each progress update.
+    pub async fn restore_with_progress(
         &self,
         repository: &Repository,
         state_id_or_prefix: &str,
         destination: Option<impl AsRef<Path>>,
         clean: bool,
         reset: bool,
-    ) -> Result<impl Stream<Item = Result<proto::Progress>> + Send + 'static> {
+        on_progress: impl FnMut(&proto::Progress),
+    ) -> Result<RestoreResponse> {
         let mut client = self.client.clone();
         let stream = client
             .restore_stream(RestoreRequest {
@@ -209,7 +218,13 @@ impl Fvs2dClient {
             .await?
             .into_inner();
 
-        Ok(stream.map_err(Error::from))
+        finish_stream(
+            stream.map_err(Error::from),
+            on_progress,
+            |progress| progress.result_restore,
+            "restore",
+        )
+        .await
     }
 
     /// Mount `layers` at `mount_point`, optionally with a writable `upper` dir.
@@ -294,6 +309,23 @@ impl Fvs2dClient {
 
         Ok(())
     }
+}
+
+/// Consume an FVS progress stream and return its terminal payload.
+async fn finish_stream<T>(
+    stream: impl Stream<Item = Result<proto::Progress>>,
+    mut on_progress: impl FnMut(&proto::Progress),
+    mut result: impl FnMut(proto::Progress) -> Option<T>,
+    operation: &'static str,
+) -> Result<T> {
+    futures_util::pin_mut!(stream);
+    while let Some(progress) = stream.try_next().await? {
+        on_progress(&progress);
+        if progress.done {
+            return result(progress).ok_or(Error::MissingStreamResult(operation));
+        }
+    }
+    Err(Error::MissingStreamResult(operation))
 }
 
 fn endpoint(socket: &Path) -> Result<Endpoint> {
