@@ -21,7 +21,8 @@ impl Layer {
         Self::from_state_id(repository, commit.map(|commit| commit.state_id.as_str()))
     }
 
-    fn from_state_id(repository: &Repository, state_id: Option<&str>) -> Self {
+    /// Select a repository state by its full identifier or prefix, or the default revision.
+    pub fn from_state_id(repository: &Repository, state_id: Option<&str>) -> Self {
         Layer {
             repository_path: repository.repository_path.clone(),
             revision: state_id.map(|state_id| crate::proto::CommitSelector {
