@@ -125,16 +125,18 @@ impl Fvs2dClient {
     }
 
     /// Commit the current working tree and stream its progress.
+    /// When `allow_empty` is true, record a new commit even if the tree is unchanged.
     pub async fn commit_stream(
         &self,
         repository: &Repository,
         message: String,
+        allow_empty: bool,
     ) -> Result<impl Stream<Item = Result<proto::Progress>> + Send + 'static> {
         let mut client = self.client.clone();
         let stream = client
             .commit_stream(CommitRequest {
                 message,
-                allow_empty: false,
+                allow_empty,
                 repository_path: repository.repository_path.clone(),
             })
             .await?
