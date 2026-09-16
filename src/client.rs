@@ -33,14 +33,19 @@ pub struct Fvs2dClient {
 }
 
 impl Fvs2dClient {
+    /// Wrap an existing transport without connecting, spawning, or checking service health.
+    pub fn from_channel(channel: Channel) -> Self {
+        Self {
+            client: GrpcClient::new(channel),
+        }
+    }
+
     /// Connect to a daemon already serving on `socket`.
     pub async fn connect(socket: impl AsRef<Path>) -> Result<Self> {
         let endpoint = endpoint(socket.as_ref())?;
         let channel = endpoint.connect().await?;
         check_health(&channel).await?;
-        Ok(Self {
-            client: GrpcClient::new(channel),
-        })
+        Ok(Self::from_channel(channel))
     }
 
     /// Connect to the stable `socket`, spawning the daemon when necessary.
@@ -75,9 +80,7 @@ impl Fvs2dClient {
         let endpoint = Endpoint::from_shared(control)?;
         let channel = connect_ready(&endpoint, &mut child).await?;
 
-        Ok(Self {
-            client: GrpcClient::new(channel),
-        })
+        Ok(Self::from_channel(channel))
     }
 
     /// Initialize an FVS repository at `path` with the given `block_size`.
