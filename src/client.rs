@@ -1,4 +1,5 @@
 use std::{
+    io::ErrorKind,
     path::Path,
     process::{Child, Command, Stdio},
     time::Duration,
@@ -75,7 +76,11 @@ impl Fvs2dClient {
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
-            .spawn()?;
+            .spawn()
+            .map_err(|error| match error.kind() {
+                ErrorKind::NotFound => Error::ExecutableNotFound(executable.to_path_buf()),
+                _ => error.into(),
+            })?;
 
         let endpoint = Endpoint::from_shared(control)?;
         let channel = connect_ready(&endpoint, &mut child).await?;

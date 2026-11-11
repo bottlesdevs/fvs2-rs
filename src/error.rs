@@ -10,6 +10,8 @@ pub enum Error {
     Transport(#[from] tonic::transport::Error),
     #[error("Tonic Status: {0}")]
     Status(#[from] tonic::Status),
+    #[error("fvs2d executable was not found: {0}")]
+    ExecutableNotFound(std::path::PathBuf),
     #[error("fvs2d exited unexpectedly with status {0}")]
     ProcessExit(std::process::ExitStatus),
     #[error("{0} progress stream ended without a result")]
